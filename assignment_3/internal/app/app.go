@@ -4,7 +4,10 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"os"
 	"time"
+
+	"github.com/joho/godotenv"
 
 	"assignment_3/internal/handler"
 	"assignment_3/internal/middleware"
@@ -15,19 +18,24 @@ import (
 )
 
 func Run() {
+	err := godotenv.Load()
+	if err != nil {
+		log.Println("No .env file found, using system env")
+	}
+
 	ctx := context.Background()
 
 	dbConfig := &modules.PostgreConfig{
-		Host:        "localhost",
-		Port:        "5432",
-		Username:    "postgres",
-		Password:    "dosik13094664",
-		DBName:      "golang_sis3",
-		SSLMode:     "disable",
+		Host:        os.Getenv("DB_HOST"),
+		Port:        os.Getenv("DB_PORT"),
+		Username:    os.Getenv("DB_USER"),
+		Password:    os.Getenv("DB_PASSWORD"),
+		DBName:      os.Getenv("DB_NAME"),
+		SSLMode:     os.Getenv("DB_SSLMODE"),
 		ExecTimeout: 5 * time.Second,
 	}
 
-	// DB
+	// Connecting to DB
 	db := postgres.NewPGXDialect(ctx, dbConfig)
 
 	// Layers
@@ -35,7 +43,6 @@ func Run() {
 	userUsecase := usecase.NewUserUsecase(repos.UserRepo)
 	userHandler := handler.NewUserHandler(userUsecase)
 
-	// Router
 	mux := http.NewServeMux()
 
 	// Healthcheck
@@ -44,7 +51,7 @@ func Run() {
 		w.Write([]byte(`{"status":"ok"}`))
 	})
 
-	// Users routes
+	// Routes
 	mux.HandleFunc("/users", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
@@ -69,11 +76,17 @@ func Run() {
 		}
 	})
 
-	// Middleware
+	// Middleware с API KEY из .env
+	apiKey := os.Getenv("API_KEY")
 	handlerWithMiddleware := middleware.Logging(
-		middleware.APIKeyAuth(mux),
+		middleware.APIKeyAuthWithKey(mux, apiKey),
 	)
 
-	log.Println("Server started on :8080")
-	log.Fatal(http.ListenAndServe(":8080", handlerWithMiddleware))
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+
+	log.Println("Server started on :" + port)
+	log.Fatal(http.ListenAndServe(":"+port, handlerWithMiddleware))
 }

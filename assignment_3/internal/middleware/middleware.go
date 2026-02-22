@@ -6,8 +6,6 @@ import (
 	"time"
 )
 
-const API_KEY = "123456"
-
 func Logging(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
@@ -16,11 +14,11 @@ func Logging(next http.Handler) http.Handler {
 	})
 }
 
-func APIKeyAuth(next http.Handler) http.Handler {
+func APIKeyAuthWithKey(next http.Handler, validKey string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		key := r.Header.Get("X-API-KEY")
-		if key != API_KEY {
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		if key == "" || key != validKey {
+			http.Error(w, "Unauthorized - Invalid API Key", http.StatusUnauthorized)
 			return
 		}
 		next.ServeHTTP(w, r)
